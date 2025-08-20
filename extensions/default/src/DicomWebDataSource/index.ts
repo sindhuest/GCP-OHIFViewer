@@ -14,6 +14,7 @@ import getImageId from './utils/getImageId.js';
 import dcmjs from 'dcmjs';
 import { retrieveStudyMetadata, deleteStudyMetadataPromise } from './retrieveStudyMetadata.js';
 import StaticWadoClient from './utils/StaticWadoClient';
+import AWSDicomWebClient from './utils/AWSDicomWebClient';
 import getDirectURL from '../utils/getDirectURL';
 import { fixBulkDataURI } from './utils/fixBulkDataURI';
 
@@ -38,6 +39,7 @@ export type DicomWebConfig = {
   qidoSupportsIncludeField?: boolean; // - Whether QIDO supports the "Include" option to request additional fields in response
   imageRendering?: string; // - wadors | ? (unsure of where/how this is used)
   thumbnailRendering?: string;
+  useAWSClient?: boolean; // Whether to use AWS HealthImaging specific client
   /**
    wadors - render using the wadors fetch.  The full image is retrieved and rendered in cornerstone to thumbnail size  png and returned as binary data to the src attribute of the  image tag.
            for example,  <img  src=data:image/png;base64,sdlfk;adkfadfk....asldfjkl;asdkf>
@@ -116,7 +118,7 @@ function createDicomWebApi(dicomWebConfig: DicomWebConfig, servicesManager) {
   // this is part of hte base standard.
   dicomWebConfig.bulkDataURI ||= { enabled: true };
 
-  const implementation = {
+  const implementation: any = {
     initialize: ({ params, query }) => {
       if (dicomWebConfig.onConfiguration && typeof dicomWebConfig.onConfiguration === 'function') {
         dicomWebConfig = dicomWebConfig.onConfiguration(dicomWebConfig, {
@@ -171,17 +173,21 @@ function createDicomWebApi(dicomWebConfig: DicomWebConfig, servicesManager) {
 
       // TODO -> Two clients sucks, but its better than 1000.
       // TODO -> We'll need to merge auth later.
-      qidoDicomWebClient = dicomWebConfig.staticWado
-        ? new StaticWadoClient(qidoConfig)
-        : new api.DICOMwebClient(qidoConfig);
+      qidoDicomWebClient = dicomWebConfig.useAWSClient
+        ? new AWSDicomWebClient(qidoConfig)
+        : dicomWebConfig.staticWado
+          ? new StaticWadoClient(qidoConfig)
+          : new api.DICOMwebClient(qidoConfig);
 
-      wadoDicomWebClient = dicomWebConfig.staticWado
-        ? new StaticWadoClient(wadoConfig)
-        : new api.DICOMwebClient(wadoConfig);
+      wadoDicomWebClient = dicomWebConfig.useAWSClient
+        ? new AWSDicomWebClient(wadoConfig)
+        : dicomWebConfig.staticWado
+          ? new StaticWadoClient(wadoConfig)
+          : new api.DICOMwebClient(wadoConfig);
     },
     query: {
       studies: {
-        mapParams: mapParams.bind(),
+        mapParams: mapParams,
         search: async function (origParams) {
           qidoDicomWebClient.headers = getAuthorizationHeader();
           const { studyInstanceUid, seriesInstanceUid, ...mappedParams } =
@@ -194,7 +200,7 @@ function createDicomWebApi(dicomWebConfig: DicomWebConfig, servicesManager) {
 
           return processResults(results);
         },
-        processResults: processResults.bind(),
+        processResults: processResults,
       },
       series: {
         // mapParams: mapParams.bind(),
@@ -679,6 +685,13 @@ function createDicomWebApi(dicomWebConfig: DicomWebConfig, servicesManager) {
     implementation.reject = dcm4cheeReject(dicomWebConfig.wadoRoot, getAuthorizationHeader);
   }
 
+  // Add reject property to implementation if it's missing
+  if (!implementation.reject) {
+    implementation.reject = async () => {
+      throw new Error('Reject operation is not supported');
+    };
+  }
+
   return IWebApiDataSource.create(implementation);
 }
 
@@ -691,7 +704,7 @@ function createDicomWebApi(dicomWebConfig: DicomWebConfig, servicesManager) {
  * @param options - to allow specifying the content type.
  */
 function retrieveBulkData(value, options = {}) {
-  const { mediaType } = options;
+  const { mediaType = '*/*' } = options || {};
   const useOptions = {
     // The bulkdata fetches work with either multipart or
     // singlepart, so set multipart to false to let the server

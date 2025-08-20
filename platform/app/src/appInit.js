@@ -40,14 +40,17 @@ async function appInit(appConfigOrFunc, defaultExtensions, defaultModes) {
   const serviceProvidersManager = new ServiceProvidersManager();
   const hotkeysManager = new HotkeysManager(commandsManager, servicesManager);
 
-  const appConfig = {
-    ...(typeof appConfigOrFunc === 'function'
-      ? await appConfigOrFunc({ servicesManager, peerImport })
-      : appConfigOrFunc),
-  };
-  // Default the peer import function
-  appConfig.peerImport ||= peerImport;
-  appConfig.measurementTrackingMode ||= 'standard';
+ const appConfig = {
+  ...(typeof appConfigOrFunc === 'function'
+    ? await appConfigOrFunc({ servicesManager, peerImport })
+    : appConfigOrFunc),
+};
+
+// ✅ Add these fallback defaults to prevent runtime crashes
+appConfig.peerImport ||= peerImport;
+appConfig.measurementTrackingMode ||= 'standard';
+appConfig.extensions ||= [];
+appConfig.modes ||= [];
 
   const extensionManager = new ExtensionManager({
     commandsManager,

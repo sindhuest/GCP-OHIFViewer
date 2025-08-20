@@ -7,6 +7,58 @@ window.config = {
   extensions: [],
   modes: [],
   customizationService: {},
+  cornerstoneExtensionConfig: {
+    useNorm16Texture: false,
+    maxNumberOfWebWorkers: 3,
+    showLoadingIndicator: true,
+    useNativeImageLoader: true,
+    errorHandler: {
+      retryOnError: true,
+      maxRetries: 3,
+      retryDelay: 1000
+    },
+    viewports: {
+      defaultViewportOptions: {
+        viewportType: 'stack',
+        orientation: 'axial',
+        initialImageOptions: {
+          custom: {
+            handleWasm: false,
+            useRGBA: true,
+            viewport: {
+              type: 'stack'
+            },
+            loaderType: 'wadors',
+            loaderSettings: {
+              enableRetry: true,
+              maxRetries: 3,
+              retryDelay: 1000
+            }
+          }
+        },
+        displayOptions: {
+          preserveViewportOptions: false,
+          enableResizeDetector: true,
+          loadAllInstances: true,
+          preloadAllInstances: true,
+          synchronizationBehavior: 'stack',
+          sliceNavigation: {
+            behavior: 'stack',
+            loadAllInstances: true,
+            useNativeLoader: true,
+            loadingStrategy: 'all'
+          }
+        }
+      }
+    }
+  },
+  studyPrefetcher: {
+    enabled: true,
+    displaySetsCount: 1,
+    maxNumPrefetchRequests: 5,
+    order: 'closest',
+    strategy: 'series'
+  },
   showStudyList: true,
   // some windows systems have issues with more than 3 web workers
   maxNumberOfWebWorkers: 3,
@@ -53,8 +105,8 @@ window.config = {
             left: 0.5,
             top: 0,
           },
-          options: 'location=no,menubar=no,scrollbars=no,status=no,titlebar=no',
-        },
+            // Rewrite URLs to point to our proxy instead of GCP directly
+            String rewrittenBody = rewriteUrlsInMetadata(body, studyId, null, null);
       ],
     },
 
@@ -105,17 +157,38 @@ window.config = {
       configuration: {
         friendlyName: 'AWS S3 Static wado server',
         name: 'aws',
-        wadoUriRoot: 'https://d14fa38qiwhyfd.cloudfront.net/dicomweb',
-        qidoRoot: 'https://d14fa38qiwhyfd.cloudfront.net/dicomweb',
-        wadoRoot: 'https://d14fa38qiwhyfd.cloudfront.net/dicomweb',
-        qidoSupportsIncludeField: false,
+        wadoUriRoot: 'http://localhost:8080/dicomweb',
+        qidoRoot: 'http://localhost:8080/dicomweb',
+        wadoRoot: 'http://localhost:8080/dicomweb',
+        qidoSupportsIncludeField: true,
         imageRendering: 'wadors',
         thumbnailRendering: 'wadors',
-        enableStudyLazyLoad: true,
-        supportsFuzzyMatching: true,
+        enableStudyLazyLoad: false,
+        supportsFuzzyMatching: false,
         supportsWildcard: false,
-        staticWado: true,
-        singlepart: 'bulkdata,video',
+        staticWado: false,
+        singlepart: true,
+        retrieveBulkData: true,
+        loadAllInstances: true,
+        storeInstances: true,
+        preloadAllInstances: true,
+        requestOptions: {
+          requestFromBrowser: true,
+          bypassCache: true,
+          headers: {
+            Accept: '*/*',
+            'Content-Type': 'application/json',
+          }
+        },
+        metadataProvider: {
+          enableInstanceLoading: true,
+          preloadInstances: true,
+          cacheMetadata: true
+        },
+        rejectWadoRsOptions: {
+          enabled: true,
+          bypassAllCache: true
+        },
         // whether the data source should use retrieveBulkData to grab metadata,
         // and in case of relative path, what would it be relative to, options
         // are in the series level or study level (some servers like series some study)

@@ -86,6 +86,12 @@ window.config = {
         supportsWildcard: true,
         staticWado: true,
         singlepart: 'bulkdata,video,pdf',
+        acceptHeader: [
+          'application/dicom+json',
+          'application/octet-stream',
+          'multipart/related; type=application/octet-stream'
+        ],
+        useAWSClient: true, // Flag to use specialized AWS client
       },
     },
     {
